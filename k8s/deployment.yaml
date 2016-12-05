@@ -14,10 +14,10 @@ spec:
     spec:
       containers:
         - name: kube-dns-manager
-          image: brickchain/kube-dns-manager:0.1
+          image: brickchain/kube-dns-manager:latest
           args:
-            - "-dns-type google"
-            - "-google-credentials /secrets/google.json"
+            - "-dns-type=google"
+            - "-google-credentials=/secrets/google.json"
           volumeMounts:
             - name: secrets
               mountPath: /secrets
