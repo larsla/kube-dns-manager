@@ -1,0 +1,22 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-example-com
+  annotations:
+    k8s.brickchain.com/dns: "true"
+spec:
+  rules:
+  - host: "test.example.com"
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: my-svc1
+          servicePort: 8080
+  - host: "test2.example.com"
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: my-svc2
+          servicePort: 8080

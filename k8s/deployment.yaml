@@ -1,0 +1,30 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  labels:
+    app: kube-dns-manager
+  name: kube-dns-manager
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: kube-dns-manager
+      name: kube-dns-manager
+    spec:
+      containers:
+        - name: kube-dns-manager
+          image: brickchain/kube-dns-manager:0.1
+          args:
+            - "-dns-type google"
+            - "-google-credentials /secrets/google.json"
+          volumeMounts:
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+        - name: kubectl-proxy
+          image: palmstonegames/kubectl-proxy:1.4.0
+      volumes:
+        - name: secrets
+          secret:
+            secretName: "dns-admin"
