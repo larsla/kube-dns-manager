@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 )
@@ -69,6 +70,47 @@ func main() {
 						err = dns.Delete(rule.Host, "A")
 						if err != nil {
 							log.Println("Error: ", err)
+						}
+					}
+				}
+			case <-done:
+				wg.Done()
+				return
+			}
+		}
+	}()
+	wg.Add(1)
+
+	s := NewServiceProcessor(wg, done)
+	go func() {
+		for {
+			select {
+			case event := <-s.Events:
+				log.Println(event.Type, event.Object.Name)
+				_, ok := event.Object.Annotations["k8s.brickchain.com/dns"]
+				if ok {
+					hostnames, ok := event.Object.Annotations["k8s.brickchain.com/dns-hostnames"]
+					if ok {
+						if event.Type == "ADDED" || event.Type == "MODIFIED" {
+							var ips []string
+							for _, ingress := range event.Object.Status.LoadBalancer.Ingress {
+								ips = append(ips, ingress.IP)
+							}
+							for _, hostname := range strings.Split(hostnames, ",") {
+								log.Println(hostname, "=>", ips)
+								err = dns.Update(hostname, ips, "A", 300)
+								if err != nil {
+									log.Println("Error: ", err)
+								}
+							}
+						} else if event.Type == "DELETED" {
+							for _, hostname := range strings.Split(hostnames, ",") {
+								log.Println("Removing", hostname)
+								err = dns.Delete(hostname, "A")
+								if err != nil {
+									log.Println("Error: ", err)
+								}
+							}
 						}
 					}
 				}

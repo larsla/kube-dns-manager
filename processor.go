@@ -20,6 +20,8 @@ const (
 	certEndpointAll    = "/apis/stable.k8s.psg.io/v1/certificates"
 	ingressEndpoint    = "/apis/extensions/v1beta1/namespaces/%s/ingresses"
 	ingressEndpointAll = "/apis/extensions/v1beta1/ingresses"
+	serviceEndpoint    = "/api/v1/namespace/%s/services"
+	serviceEndpointAll = "/api/v1/services"
 	secretsEndpoint    = "/api/v1/namespaces/%s/secrets"
 	secretsEndpointAll = "/api/v1/secrets"
 	eventsEndpoint     = "/api/v1/namespaces/%s/events"
@@ -37,8 +39,19 @@ type IngressEvent struct {
 	Object v1beta1.Ingress `json:"object"`
 }
 
+type ServiceEvent struct {
+	Type   string     `json:"type"`
+	Object v1.Service `json:"object"`
+}
+
 type IngressProcessor struct {
 	Events chan (IngressEvent)
+	done   chan (bool)
+	wg     *sync.WaitGroup
+}
+
+type ServiceProcessor struct {
+	Events chan (ServiceEvent)
 	done   chan (bool)
 	wg     *sync.WaitGroup
 }
@@ -84,6 +97,57 @@ func (d *IngressProcessor) run() {
 }
 
 func (d *IngressProcessor) processIngressEvent(event IngressEvent) {
+	annotation, ok := event.Object.Annotations[annotationNamespace]
+	if ok {
+		if annotation == "true" {
+			d.Events <- event
+		}
+	} else {
+		log.Println("Event did not have our annotation, ignoring.")
+	}
+}
+
+func NewServiceProcessor(wg *sync.WaitGroup, done chan bool) *ServiceProcessor {
+	i := &ServiceProcessor{
+		Events: make(chan (ServiceEvent)),
+		done:   done,
+		wg:     wg,
+	}
+
+	go i.run()
+	i.wg.Add(1)
+
+	return i
+}
+
+func (d *ServiceProcessor) run() {
+	serviceEvents, serviceErrs := monitorServiceEvents(serviceEndpointAll)
+	watchErrs := make(chan error)
+	go func() {
+		for {
+			select {
+			case err := <-serviceErrs:
+				watchErrs <- err
+			case <-d.done:
+				return
+			}
+		}
+	}()
+	for {
+		select {
+		case event := <-serviceEvents:
+			d.processServiceEvent(event)
+		case err := <-watchErrs:
+			log.Printf("Error while watching kubernetes events: %v", err)
+		case <-d.done:
+			d.wg.Done()
+			log.Println("Stopped DNS event watcher.")
+			return
+		}
+	}
+}
+
+func (d *ServiceProcessor) processServiceEvent(event ServiceEvent) {
 	annotation, ok := event.Object.Annotations[annotationNamespace]
 	if ok {
 		if annotation == "true" {
@@ -183,6 +247,31 @@ func monitorIngressEvents(endpoint string) (<-chan IngressEvent, <-chan error) {
 			select {
 			case ev := <-rawEvents:
 				var event IngressEvent
+				event.Type = ev.Type
+				err := json.Unmarshal([]byte(ev.Object), &event.Object)
+				if err != nil {
+					errc <- err
+					continue
+				}
+				events <- event
+			case err := <-rawErrc:
+				errc <- err
+			}
+		}
+	}()
+
+	return events, errc
+}
+
+func monitorServiceEvents(endpoint string) (<-chan ServiceEvent, <-chan error) {
+	rawEvents, rawErrc := monitorEvents(endpoint)
+	events := make(chan ServiceEvent)
+	errc := make(chan error, 1)
+	go func() {
+		for {
+			select {
+			case ev := <-rawEvents:
+				var event ServiceEvent
 				event.Type = ev.Type
 				err := json.Unmarshal([]byte(ev.Object), &event.Object)
 				if err != nil {
