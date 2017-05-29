@@ -57,11 +57,13 @@ func main() {
 					for _, ingress := range event.Object.Status.LoadBalancer.Ingress {
 						ips = append(ips, ingress.IP)
 					}
-					for _, rule := range event.Object.Spec.Rules {
-						log.Println(rule.Host, "=>", ips)
-						err = dns.Update(rule.Host, ips, "A", 300)
-						if err != nil {
-							log.Println("Error: ", err)
+					if len(ips) > 0 {
+						for _, rule := range event.Object.Spec.Rules {
+							log.Println(rule.Host, "=>", ips)
+							err = dns.Update(rule.Host, ips, "A", 300)
+							if err != nil {
+								log.Println("Error: ", err)
+							}
 						}
 					}
 				} else if event.Type == "DELETED" {
@@ -96,11 +98,13 @@ func main() {
 							for _, ingress := range event.Object.Status.LoadBalancer.Ingress {
 								ips = append(ips, ingress.IP)
 							}
-							for _, hostname := range strings.Split(hostnames, ",") {
-								log.Println(hostname, "=>", ips)
-								err = dns.Update(hostname, ips, "A", 300)
-								if err != nil {
-									log.Println("Error: ", err)
+							if len(ips) > 0 {
+								for _, hostname := range strings.Split(hostnames, ",") {
+									log.Println(hostname, "=>", ips)
+									err = dns.Update(hostname, ips, "A", 300)
+									if err != nil {
+										log.Println("Error: ", err)
+									}
 								}
 							}
 						} else if event.Type == "DELETED" {
