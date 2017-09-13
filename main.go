@@ -41,6 +41,9 @@ func main() {
 	default:
 		log.Fatalf("DNS type not supported: %s", dnsType)
 	}
+	if err != nil {
+		log.Fatal("Failed to connect to DNS provider: ", err)
+	}
 
 	// Asynchronously start watching and refreshing certs
 	wg := &sync.WaitGroup{}
