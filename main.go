@@ -68,13 +68,31 @@ func main() {
 								log.Println("Error: ", err)
 							}
 						}
+						for _, tls := range event.Object.Spec.TLS {
+							log.Println(tls.Hosts, "=>", ips)
+							for _, host := range tls.Hosts {
+								err = dns.Update(host, ips, "A", 300)
+								if err != nil {
+									log.Println("Error: ", err)
+								}
+							}
+						}
 					}
 				} else if event.Type == "DELETED" {
 					for _, rule := range event.Object.Spec.Rules {
-						log.Println("Delete host", rule.Host)
+						log.Println("Delete host ", rule.Host)
 						err = dns.Delete(rule.Host, "A")
 						if err != nil {
 							log.Println("Error: ", err)
+						}
+					}
+					for _, tls := range event.Object.Spec.TLS {
+						for _, host := range tls.Hosts {
+							log.Println("Delete host ", host)
+							err = dns.Delete(host, "A")
+							if err != nil {
+								log.Println("Error: ", err)
+							}
 						}
 					}
 				}
