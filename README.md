@@ -15,7 +15,7 @@ kind: Ingress
 metadata:
   name: test-example-com
   annotations:
-    k8s.brickchain.com/dns: "true"
+    k8s.lars.dev/dns: "true"
 spec:
   rules:
   - host: "test.example.com"

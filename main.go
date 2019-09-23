@@ -15,10 +15,12 @@ func main() {
 	var (
 		dnsType      string
 		gdnsCertFile string
+		domainsuffix string
 	)
 
 	flag.StringVar(&dnsType, "dns-type", "google", "What DNS provider")
 	flag.StringVar(&gdnsCertFile, "google-credentials", "", "Google credentials file")
+	flag.StringVar(&domainsuffix, "suffix", "", "Only handle domains with suffix")
 	flag.Parse()
 
 	if dnsType == "" {
@@ -50,6 +52,10 @@ func main() {
 	done := make(chan bool)
 	i := NewIngressProcessor(wg, done)
 
+	shouldHandle := func(name string) bool {
+		return strings.HasSuffix(name, domainsuffix)
+	}
+
 	go func() {
 		for {
 			select {
@@ -62,36 +68,44 @@ func main() {
 					}
 					if len(ips) > 0 {
 						for _, rule := range event.Object.Spec.Rules {
-							log.Println(rule.Host, "=>", ips)
-							err = dns.Update(rule.Host, ips, "A", 300)
-							if err != nil {
-								log.Println("Error: ", err)
+							if shouldHandle(rule.Host) {
+								log.Println(rule.Host, "=>", ips)
+								err = dns.Update(rule.Host, ips, "A", 300)
+								if err != nil {
+									log.Println("Error: ", err)
+								}
 							}
 						}
 						for _, tls := range event.Object.Spec.TLS {
 							log.Println(tls.Hosts, "=>", ips)
 							for _, host := range tls.Hosts {
-								err = dns.Update(host, ips, "A", 300)
-								if err != nil {
-									log.Println("Error: ", err)
+								if shouldHandle(host) {
+									err = dns.Update(host, ips, "A", 300)
+									if err != nil {
+										log.Println("Error: ", err)
+									}
 								}
 							}
 						}
 					}
 				} else if event.Type == "DELETED" {
 					for _, rule := range event.Object.Spec.Rules {
-						log.Println("Delete host ", rule.Host)
-						err = dns.Delete(rule.Host, "A")
-						if err != nil {
-							log.Println("Error: ", err)
+						if shouldHandle(rule.Host) {
+							log.Println("Delete host ", rule.Host)
+							err = dns.Delete(rule.Host, "A")
+							if err != nil {
+								log.Println("Error: ", err)
+							}
 						}
 					}
 					for _, tls := range event.Object.Spec.TLS {
 						for _, host := range tls.Hosts {
-							log.Println("Delete host ", host)
-							err = dns.Delete(host, "A")
-							if err != nil {
-								log.Println("Error: ", err)
+							if shouldHandle(host) {
+								log.Println("Delete host ", host)
+								err = dns.Delete(host, "A")
+								if err != nil {
+									log.Println("Error: ", err)
+								}
 							}
 						}
 					}
@@ -110,9 +124,9 @@ func main() {
 			select {
 			case event := <-s.Events:
 				log.Println(event.Type, event.Object.Name)
-				_, ok := event.Object.Annotations["k8s.brickchain.com/dns"]
+				_, ok := event.Object.Annotations["k8s.lars.dev/dns"]
 				if ok {
-					hostnames, ok := event.Object.Annotations["k8s.brickchain.com/dns-hostnames"]
+					hostnames, ok := event.Object.Annotations["k8s.lars.dev/dns-hostnames"]
 					if ok {
 						if event.Type == "ADDED" || event.Type == "MODIFIED" {
 							var ips []string
@@ -121,19 +135,23 @@ func main() {
 							}
 							if len(ips) > 0 {
 								for _, hostname := range strings.Split(hostnames, ",") {
-									log.Println(hostname, "=>", ips)
-									err = dns.Update(hostname, ips, "A", 300)
-									if err != nil {
-										log.Println("Error: ", err)
+									if shouldHandle(hostname) {
+										log.Println(hostname, "=>", ips)
+										err = dns.Update(hostname, ips, "A", 300)
+										if err != nil {
+											log.Println("Error: ", err)
+										}
 									}
 								}
 							}
 						} else if event.Type == "DELETED" {
 							for _, hostname := range strings.Split(hostnames, ",") {
-								log.Println("Removing", hostname)
-								err = dns.Delete(hostname, "A")
-								if err != nil {
-									log.Println("Error: ", err)
+								if shouldHandle(hostname) {
+									log.Println("Removing", hostname)
+									err = dns.Delete(hostname, "A")
+									if err != nil {
+										log.Println("Error: ", err)
+									}
 								}
 							}
 						}
@@ -156,5 +174,4 @@ func main() {
 	log.Println("Shutdown signal received, exiting...")
 	close(done)
 	wg.Wait()
-	return
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -10,23 +9,16 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"k8s.io/client-go/pkg/api/v1"
-	"k8s.io/client-go/pkg/apis/extensions/v1beta1"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/extensions/v1beta1"
 )
 
 const (
 	apiHost            = "http://127.0.0.1:8001"
-	certEndpoint       = "/apis/stable.k8s.psg.io/v1/namespaces/%s/certificates"
-	certEndpointAll    = "/apis/stable.k8s.psg.io/v1/certificates"
-	ingressEndpoint    = "/apis/extensions/v1beta1/namespaces/%s/ingresses"
 	ingressEndpointAll = "/apis/extensions/v1beta1/ingresses"
-	serviceEndpoint    = "/api/v1/namespace/%s/services"
 	serviceEndpointAll = "/api/v1/services"
-	secretsEndpoint    = "/api/v1/namespaces/%s/secrets"
-	secretsEndpointAll = "/api/v1/secrets"
-	eventsEndpoint     = "/api/v1/namespaces/%s/events"
 
-	annotationNamespace = "k8s.brickchain.com/dns"
+	annotationNamespace = "k8s.lars.dev/dns"
 )
 
 type WatchEvent struct {
@@ -158,40 +150,6 @@ func (d *ServiceProcessor) processServiceEvent(event ServiceEvent) {
 	}
 }
 
-func ingressReference(ing v1beta1.Ingress, path string) v1.ObjectReference {
-	return v1.ObjectReference{
-		Kind:            "Ingress",
-		Namespace:       ing.Namespace,
-		Name:            ing.Name,
-		UID:             ing.UID,
-		ResourceVersion: ing.ResourceVersion,
-		FieldPath:       path,
-	}
-}
-
-func getIngresses(endpoint string) ([]v1beta1.Ingress, error) {
-	var resp *http.Response
-	var err error
-
-	for {
-		resp, err = http.Get(apiHost + endpoint)
-		if err != nil {
-			log.Printf("Error while retrieving ingress: %v. Retrying in 5 seconds", err)
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		break
-	}
-
-	var ingressList v1beta1.IngressList
-	err = json.NewDecoder(resp.Body).Decode(&ingressList)
-	if err != nil {
-		return nil, err
-	}
-
-	return ingressList.Items, nil
-}
-
 func monitorEvents(endpoint string) (<-chan WatchEvent, <-chan error) {
 	events := make(chan WatchEvent)
 	errc := make(chan error, 1)
@@ -286,8 +244,4 @@ func monitorServiceEvents(endpoint string) (<-chan ServiceEvent, <-chan error) {
 	}()
 
 	return events, errc
-}
-
-func namespacedEndpoint(endpoint string, namespace string) string {
-	return fmt.Sprintf(endpoint, namespace)
 }
