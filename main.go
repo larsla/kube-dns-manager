@@ -74,6 +74,8 @@ func main() {
 								if err != nil {
 									log.Println("Error: ", err)
 								}
+							} else {
+								log.Println("Skipping ", rule.Host)
 							}
 						}
 						for _, tls := range event.Object.Spec.TLS {
@@ -84,6 +86,8 @@ func main() {
 									if err != nil {
 										log.Println("Error: ", err)
 									}
+								} else {
+									log.Println("Skipping ", host)
 								}
 							}
 						}
@@ -96,6 +100,8 @@ func main() {
 							if err != nil {
 								log.Println("Error: ", err)
 							}
+						} else {
+							log.Println("Skipping ", rule.Host)
 						}
 					}
 					for _, tls := range event.Object.Spec.TLS {
@@ -106,6 +112,8 @@ func main() {
 								if err != nil {
 									log.Println("Error: ", err)
 								}
+							} else {
+								log.Println("Skipping ", host)
 							}
 						}
 					}
