@@ -53,7 +53,7 @@ func main() {
 	i := NewIngressProcessor(wg, done)
 
 	shouldHandle := func(name string) bool {
-		return strings.HasSuffix(name, domainsuffix)
+		return strings.HasSuffix(strings.TrimSuffix(name, "."), strings.TrimSuffix(domainsuffix, "."))
 	}
 
 	go func() {
